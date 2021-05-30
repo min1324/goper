@@ -36,7 +36,7 @@ func (pe poolError) Error() string {
 		return "GoPool " + pe.name + " not run."
 
 	case errSafeCall:
-		return "[WARN]GoPool " + pe.name
+		return "[WARN]GoPool " + pe.name + " :"
 
 	case errChanClose:
 		return "GoPool " + pe.name + " chan closed."

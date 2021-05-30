@@ -1,7 +1,6 @@
 package goper
 
 import (
-	"errors"
 	"log"
 	"runtime"
 	"sync"
@@ -56,10 +55,10 @@ func (g *Goper) String() string { return g.name }
 // Deliver send an arg to handler,
 // if Goper not run, it return an error.
 func (g *Goper) Deliver(arg interface{}) error {
-	return g.put(arg, nil)
+	return g.put(arg)
 }
 
-func (g *Goper) put(arg interface{}, ch chan error) error {
+func (g *Goper) put(arg interface{}) error {
 	if g.isStop() {
 		return poolError{name: g.String(), reason: errNotRun}
 	}
@@ -151,9 +150,7 @@ func (g *Goper) goroutine() {
 func safeCall(f Handler, arg interface{}, n string) {
 	defer func() {
 		if e := recover(); e != nil {
-			err := poolError{name: n, reason: errSafeCall}
-			er := errors.New(err.Error() + e.(error).Error())
-			log.Println(er.Error())
+			log.Println(e)
 		}
 	}()
 	f(arg)
