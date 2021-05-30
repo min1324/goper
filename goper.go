@@ -14,12 +14,10 @@ const (
 )
 
 var (
-	defaultCPU      = runtime.NumCPU()
-	defaultGoNum    = defaultCPU
-	defaultChanSize = defaultCPU * 64
+	defaultNumCPU   = runtime.NumCPU()
+	defaultGoNum    = defaultNumCPU
+	defaultChanSize = defaultNumCPU * 64
 )
-
-type empty struct{}
 
 // Handler user handler fuction type.
 type Handler func(interface{})
@@ -34,36 +32,30 @@ type task struct {
 // Goper is safety to close all goroutine before done
 // the task using Put() to channal.
 type Goper struct {
-	flag uint32 // channal flag indicate goper if running or closed.
-	name string // use for debug
-
-	hd     Handler   // user handler function.
-	taskCh chan task // send to handler channal.
+	flag uint32    // channal flag indicate goper if running or closed.
+	name string    // use for debug
+	hd   Handler   // user handler function.
+	task chan task // send to handler channal.
 
 	mux sync.Mutex
 	wg  sync.WaitGroup
 }
 
 func (g *Goper) lazyInit() {
-	if g.taskCh == nil {
-		g.taskCh = make(chan task, defaultChanSize)
+	if g.task == nil {
+		g.task = make(chan task, defaultChanSize)
 	}
 }
 
-// Handler user handler function.
-// it will call after recive an value
-// from channal by Send(v).
-func (g *Goper) Handler(hd Handler) { g.hd = hd }
-
-// Name register pool name.
+// Name register Goper name.
 func (g *Goper) Name(name string) { g.name = name }
 
-// String get pool name.
+// String get Goper name.
 func (g *Goper) String() string { return g.name }
 
-// Send send a value to handle,
-// if pool not run,it return an error.
-func (g *Goper) Put(arg interface{}) error {
+// Deliver send an arg to handler,
+// if Goper not run, it return an error.
+func (g *Goper) Deliver(arg interface{}) error {
 	return g.put(arg, nil)
 }
 
@@ -72,7 +64,7 @@ func (g *Goper) put(arg interface{}, ch chan error) error {
 		return poolError{name: g.String(), reason: errNotRun}
 	}
 	// BUG channal meby closed by Stop().
-	g.taskCh <- task{arg: arg}
+	g.task <- task{arg: arg}
 	return nil
 }
 
@@ -85,30 +77,30 @@ func (g *Goper) Close() {
 	g.mux.Lock()
 	defer g.mux.Unlock()
 
-	if g.taskCh == nil {
+	if g.task == nil {
 		return
 	}
 	g.stopFlag()
 
-	// TODO wait Send() finish send i.
+	// TODO wait Put() finish send i.
 	// waitting by done rest task
-	for len(g.taskCh) > 0 {
+	for len(g.task) > 0 {
 		runtime.Gosched()
-	} // end waitting Send().
+	} // end waitting Put().
 
-	close(g.taskCh)
+	close(g.task)
 
 	g.wg.Wait()
-	g.taskCh = nil
+	g.task = nil
 }
 
 // Default run maxGo num of goroutine.
 // if maxGo<1, it will use numcpu.
 func (g *Goper) Default(maxGo int, hd Handler) error {
-	return g.run(maxGo, hd)
+	return g.runner(maxGo, hd)
 }
 
-func (g *Goper) run(maxGo int, hd Handler) error {
+func (g *Goper) runner(maxGo int, hd Handler) error {
 	if hd == nil {
 		return poolError{name: g.String(), reason: errHdNotSet}
 	}
@@ -135,8 +127,9 @@ func (g *Goper) run(maxGo int, hd Handler) error {
 	return nil
 }
 
-func (g *Goper) shced(num int) {
-	for i := 0; i < num; i++ {
+// run num's goroutine
+func (g *Goper) shced(maxgo int) {
+	for i := 0; i < maxgo; i++ {
 		g.goroutine()
 	}
 }
@@ -146,7 +139,7 @@ func (g *Goper) goroutine() {
 	go func() {
 		defer g.wg.Done()
 		for {
-			t, ok := <-g.taskCh
+			t, ok := <-g.task
 			if !ok {
 				return
 			}
