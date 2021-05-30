@@ -10,9 +10,9 @@ witch had putting into channal.
 ## 使用说明
 
 - frist, import goper into code: `import github/min1324/goper`
-- use Auto or Default mode to run.
+- use Default to run.
 
-- use Put(arg), send arg to handle.
+- use Deliver(arg), send arg to handle.
 
 - finally,Close() to release and exit goroutine.
 
@@ -24,7 +24,7 @@ witch had putting into channal.
 type Handler func(interface{})
 Close()
 Default(maxGo int, hd Handler) error
-Put(arg interface{}) error
+Deliver(arg interface{}) error
 ```
 
 
@@ -36,23 +36,23 @@ package main
 
 import (
 	"fmt"
-	"github.com/min1324/goper"
+	"github/min1324/goper"
 )
 
 func main() {
-	var p goper.Goper
-	p.Auto(1024,Handler)
-	defer p.Close()
+	var g goper.Goper
+	g.Default(1, Router)
+	defer g.Close()
 
-	p.Put("hello world.")
+	g.Deliver("hello world.")
 }
 
-func Handler(i interface{}) {
-	v, ok := i.(string)
-	if !ok {
-		return
+func Router(i interface{}) {
+	s, ok := i.(string)
+	if ok {
+		fmt.Println(s)
 	}
-	fmt.Println(v)
 }
+
 
 ```
